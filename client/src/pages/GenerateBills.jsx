@@ -2,15 +2,18 @@ import React, { useState } from "react";
 import Navbar from "../components/Navbar.jsx";
 import Sidebar from "../components/Sidebar.jsx";
 import PrimaryButton from "../components/PrimaryButton.jsx";
+import { generateAllBills } from "../api/billApi.js";
 
 export default function GenerateBills() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     month: "",
     foodCost: "",
     extras: "",
   });
+
+  const user = JSON.parse(localStorage.getItem("user"));
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -19,14 +22,32 @@ export default function GenerateBills() {
   const total =
     (Number(formData.foodCost) || 0) + (Number(formData.extras) || 0);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!formData.month || !formData.foodCost) {
       alert("⚠️ Please fill required fields.");
       return;
     }
 
-    console.log("Generated Bills:", formData);
-    alert(`✅ Bills generated for ${formData.month}!`);
+    try {
+      setLoading(true);
+      const [year, month] = formData.month.split("-");
+
+      const { data } = await generateAllBills({
+        messId: user?.messId,
+        month: parseInt(month),
+        year: parseInt(year),
+        fixedCharges: Number(formData.extras) || 0,
+      });
+
+      alert(
+        `✅ Successfully generated ${data.data.generated} bills!\nErrors: ${data.data.errors}`
+      );
+    } catch (err) {
+      console.error(err);
+      alert("❌ Failed to generate bills: " + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -35,8 +56,6 @@ export default function GenerateBills() {
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <main className="container-narrow py-10">
-
-        {/* Header */}
         <header className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">Generate Mess Bills</h1>
           <p className="text-neutral-600 mt-1">
@@ -44,10 +63,7 @@ export default function GenerateBills() {
           </p>
         </header>
 
-        {/* Form */}
         <section className="bg-white border border-neutral-200 shadow-sm rounded-xl p-6 space-y-6">
-
-          {/* Month */}
           <div>
             <label className="text-sm text-neutral-600">Select Month *</label>
             <input
@@ -58,7 +74,6 @@ export default function GenerateBills() {
             />
           </div>
 
-          {/* Food Cost */}
           <div>
             <label className="text-sm text-neutral-600">Food Cost (per student) *</label>
             <input
@@ -70,7 +85,6 @@ export default function GenerateBills() {
             />
           </div>
 
-          {/* Extra Charges */}
           <div>
             <label className="text-sm text-neutral-600">Extra Charges (optional)</label>
             <input
@@ -82,17 +96,16 @@ export default function GenerateBills() {
             />
           </div>
 
-          {/* Total */}
           <div className="text-lg font-semibold text-blue-700">
             Total Bill Per Student: ₹{total}
           </div>
         </section>
 
-        {/* Generate Button */}
         <div className="mt-8 flex justify-end">
-          <PrimaryButton onClick={handleGenerate}>Generate Bills</PrimaryButton>
+          <PrimaryButton onClick={handleGenerate} disabled={loading}>
+            {loading ? "Generating..." : "Generate Bills"}
+          </PrimaryButton>
         </div>
-
       </main>
     </div>
   );

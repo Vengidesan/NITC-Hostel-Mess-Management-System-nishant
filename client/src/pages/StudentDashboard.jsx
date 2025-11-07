@@ -71,7 +71,7 @@ export default function StudentDashboard(){
             description="Check dues and pay securely via UPI, card, or netbanking."
             actions={
               <div className="flex gap-3">
-                <OutlineButton>View Bills</OutlineButton>
+                <OutlineButton onClick={()=>{navigate('/bills')}}>View Bills</OutlineButton>
                 <PrimaryButton>Pay Now</PrimaryButton>
               </div>
             }

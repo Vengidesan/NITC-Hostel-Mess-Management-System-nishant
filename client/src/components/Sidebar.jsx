@@ -1,7 +1,7 @@
 import React from "react";
 import { Home, Utensils, Star, ClipboardList, ReceiptIndianRupee, Settings, LogOut } from "lucide-react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const NAV = [
   { icon: Home, label: "Dashboard" },
@@ -13,6 +13,7 @@ const NAV = [
 
 export default function Sidebar({ open, onClose }) {
   const navigate =useNavigate();
+  const user=JSON.parse(localStorage.getItem('user'));
   const handleLogout = async () => {
     const token=localStorage.getItem('token')
     try {
@@ -65,8 +66,14 @@ export default function Sidebar({ open, onClose }) {
               </li>
             ))}
           </ul>
+          
 
           <div className="mt-4 pt-4 border-t border-neutral-200/70">
+            {user.role === "manager" && (
+  <Link to="/manager/feedback" className="sidebar-item">
+    Feedback Dashboard
+  </Link>
+)}
             <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent/70 text-left">
               <Settings className="h-5 w-5 text-primary" />
               <span className="text-sm font-medium">Settings</span>

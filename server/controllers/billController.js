@@ -22,6 +22,23 @@ export const generateBill = async (req, res) => {
     const rates = mealRates || DEFAULT_MEAL_RATES;
     const fixed = fixedCharges || DEFAULT_FIXED_CHARGES;
 
+        // ✅ Restrict admin to generate only previous month's bills
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1; // JS months are 0-indexed
+    const currentYear = now.getFullYear();
+
+    // Calculate previous month & year
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
+    if (parseInt(year) !== prevYear || parseInt(month) !== prevMonth) {
+      return res.status(400).json({
+        success: false,
+        message: `❌ You can only generate bills for the previous month (${prevMonth}-${prevYear}).`,
+      });
+    }
+
+
     const bill = await Bill.generateFromAttendance(
       studentId,
       messId,
@@ -61,6 +78,23 @@ export const generateAllBills = async (req, res) => {
 
     const rates = mealRates || DEFAULT_MEAL_RATES;
     const fixed = fixedCharges || DEFAULT_FIXED_CHARGES;
+
+        // ✅ Restrict admin to generate only previous month's bills
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1; // JS months are 0-indexed
+    const currentYear = now.getFullYear();
+
+    // Calculate previous month & year
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
+    if (parseInt(year) !== prevYear || parseInt(month) !== prevMonth) {
+      return res.status(400).json({
+        success: false,
+        message: `❌ You can only generate bills for the previous month (${prevMonth}-${prevYear}).`,
+      });
+    }
+
 
     // Get all students in the mess
     const students = await User.find({ messId, role: 'student', isActive: true });

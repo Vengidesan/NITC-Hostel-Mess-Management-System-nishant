@@ -13,17 +13,9 @@ import PaymentRecords from "./pages/PaymentRecords.jsx";
 import GenerateBills from "./pages/GenerateBills.jsx";
 import SignIn from "./pages/SignIn.jsx";
 import SignUp from "./pages/SignUp.jsx";
+import ManagerFeedback from "./pages/ManagerFeedback.jsx";
 
-
-
-
-
-
-
-
-
-
-export default function App(){
+export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/signin" />} />
@@ -40,16 +32,13 @@ export default function App(){
       <Route path="/generate-bills" element={<GenerateBills />} />
       <Route path="/signin" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
+      <Route path="/feedback" element={<Feedback />} />
+      <Route path="/manager/feedback" element={<ManagerFeedback />} />
 
-
-
-
-
-
-
-
-
-      <Route path="*" element={<h1 className="p-8 text-2xl">404 • Page not found</h1>} />
+      <Route
+        path="*"
+        element={<h1 className="p-8 text-2xl">404 • Page not found</h1>}
+      />
     </Routes>
   );
 }

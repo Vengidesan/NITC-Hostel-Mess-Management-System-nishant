@@ -16,6 +16,7 @@ const router = express.Router();
 
 // Public routes
 router.get('/current/:messId', getCurrentMenu);
+router.get('/previous/:messId', getPreviousMenu);
 router.get('/date/:messId/:date', getMenuByDate);
 
 // Protected routes - Manager only
@@ -26,10 +27,7 @@ router.delete('/:id', protect, authorize('manager', 'admin'), deleteMenu);
 
 // Protected routes - All authenticated users
 router.get('/mess/:messId', protect, getAllMenusForMess);
-router.get(
-  '/previous/:messId',
-  getPreviousMenu
-);
+
 
 
 export default router;

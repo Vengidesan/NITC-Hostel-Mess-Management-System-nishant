@@ -331,6 +331,7 @@ BillSchema.methods.cancelBill = function (userId, reason) {
 };
 
 // Static method to generate bill from attendance data
+// ========================================
 BillSchema.statics.generateFromAttendance = async function (
   studentId,
   messId,
@@ -345,86 +346,78 @@ BillSchema.statics.generateFromAttendance = async function (
 
   // Get student details
   const student = await User.findById(studentId);
-  if (!student) {
-    throw new Error('Student not found');
-  }
+  if (!student) throw new Error('Student not found');
 
-  // Check if bill already exists
+  // Check duplicate bill
   const existingBill = await this.findOne({ studentId, month, year, isCancelled: false });
-  if (existingBill) {
-    throw new Error('Bill already exists for this month');
-  }
+  if (existingBill) throw new Error('Bill already exists for this month');
 
-  // Calculate billing period
+  // Determine billing period
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0, 23, 59, 59);
   const totalDaysInMonth = endDate.getDate();
 
-  // Get attendance summary
-  const attendanceSummary = await Attendance.getAttendanceSummary(
+  // Fetch attendance records for the month
+  const attendanceRecords = await Attendance.find({
     studentId,
-    month,
-    year
-  );
+    date: { $gte: startDate, $lte: endDate },
+  });
 
-  // Calculate meal-wise consumption
+  // Count explicit absences (marked leave or meals with isPresent=false)
+  let absentDays = 0;
+  let absentMealCount = 0;
+
+  attendanceRecords.forEach((record) => {
+    if (record.isOnLeave || record.totalMealsPresent === 0) {
+      absentDays++;
+    }
+    absentMealCount += record.totalMealsAbsent || 0;
+  });
+
+  // Calculate present days and meals (all other days are present)
+  const daysPresent = totalDaysInMonth - absentDays;
+  const totalMealsConsumed = daysPresent * 4 - absentMealCount;
+
+  // Meal-wise charge calculation
   const mealTypes = ['breakfast', 'lunch', 'eveningSnacks', 'dinner'];
-  const mealWiseCharges = [];
-
-  for (const mealType of mealTypes) {
+  const mealWiseCharges = mealTypes.map((mealType) => {
     const rate = mealRates[mealType] || 0;
-    
-    // Get actual meal consumption for this meal type
-    const attendanceRecords = await Attendance.find({
-      studentId,
-      date: { $gte: startDate, $lte: endDate },
-    });
-
-    let daysConsumed = 0;
-    attendanceRecords.forEach((record) => {
-      const meal = record.meals.find((m) => m.mealType === mealType);
-      if (meal && meal.isPresent) {
-        daysConsumed++;
-      }
-    });
-
+    const daysConsumed = daysPresent; // default assumption: present every day except leave
     const totalAmount = daysConsumed * rate;
+    return { mealType, rate, daysConsumed, totalAmount };
+  });
 
-    mealWiseCharges.push({
-      mealType,
-      rate,
-      daysConsumed,
-      totalAmount,
-    });
-  }
-
-  // Generate bill number
-  const billNumber = await this.generateBillNumber(messId, month, year);
-
-  // Set due date (15 days from bill generation)
+  // Compute total amounts
+  const baseAmount = mealWiseCharges.reduce((sum, m) => sum + m.totalAmount, 0);
+  const totalAmount = baseAmount + fixedCharges;
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + 15);
 
-  // Create bill
+  // Create the bill
   const bill = await this.create({
-    billNumber,
+    billNumber: await this.generateBillNumber(messId, month, year),
     studentId,
     messId,
     month,
     year,
     billingPeriod: { startDate, endDate },
     totalDaysInMonth,
-    daysPresent: attendanceSummary.presentDays || 0,
-    daysAbsent: attendanceSummary.absentDays || totalDaysInMonth,
-    totalMealsConsumed: attendanceSummary.totalMealsPresent || 0,
+    daysPresent,
+    daysAbsent: absentDays,
+    totalMealsConsumed,
     mealWiseCharges,
-    fixedCharges: fixedCharges || 0,
+    fixedCharges,
+    baseAmount,
+    totalAmount,
+    amountDue: totalAmount,
+    paymentStatus: 'unpaid',
     dueDate,
     generatedBy,
   });
 
   return bill;
 };
+
 
 // Static method to get unpaid bills
 BillSchema.statics.getUnpaidBills = async function (messId) {

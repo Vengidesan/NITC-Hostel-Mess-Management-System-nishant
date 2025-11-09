@@ -10,6 +10,7 @@ export default function ManageMenus() {
   const [weeklyMenu, setWeeklyMenu] = useState({});
   const [menus, setMenus] = useState([]);
   const [currentMenu, setCurrentMenu] = useState(null);
+  const [nextWeekMenu, setNextWeekMenu] = useState(null);
   const [isPublished, setIsPublished] = useState(false);
   const [refresh, setRefresh] = useState(false);
 
@@ -17,7 +18,9 @@ export default function ManageMenus() {
   const token = localStorage.getItem("token");
   const messId = storedUser?.messId;
 
-  // 🧩 Format backend menu into form
+  const api = import.meta.env.VITE_SERVER_URL || "http://localhost:5000";
+
+  // 🧩 Format backend menu into editable form
   const formatMenu = (menuData) => {
     const formatted = {};
     menuData.dailyMenus.forEach((dayMenu) => {
@@ -30,36 +33,46 @@ export default function ManageMenus() {
     return formatted;
   };
 
-  // 🟢 Fetch menus and load current/previous
+  // 🟢 Fetch all menus and detect current + next week
   useEffect(() => {
     const fetchMenus = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(
-          `http://localhost:5000/api/menu/mess/${messId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setMenus(res.data.data);
+        const res = await axios.get(`${api}/api/menu/mess/${messId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const data = res.data.data || [];
+        setMenus(data);
 
         const today = new Date();
-        const current = res.data.data.find(
-          (m) =>
-            new Date(m.weekStartDate) <= today &&
-            new Date(m.weekEndDate) >= today
-        );
+
+        // ✅ Detect current week correctly (till Sunday 23:59)
+        const current = data.find((m) => {
+          const start = new Date(m.weekStartDate);
+          const end = new Date(m.weekEndDate);
+          end.setHours(23, 59, 59, 999);
+          return start <= today && today <= end;
+        });
+
+        // ✅ Detect next week's menu if exists
+        const next = data.find((m) => {
+          const start = new Date(m.weekStartDate);
+          return start > today;
+        });
+
+        setNextWeekMenu(next || null);
 
         if (current) {
           setCurrentMenu(current);
-          if (current.status === "published") {
-            setIsPublished(true);
-          } else {
-            setWeeklyMenu(formatMenu(current));
-          }
+          setIsPublished(current.status === "published");
+          setWeeklyMenu(formatMenu(current));
         } else {
-          fetchPreviousMenu();
+          await fetchPreviousMenu();
         }
       } catch (error) {
         console.error("Error fetching menus:", error.message);
+        await fetchPreviousMenu();
       } finally {
         setLoading(false);
       }
@@ -67,12 +80,15 @@ export default function ManageMenus() {
 
     const fetchPreviousMenu = async () => {
       try {
-        const response = await axios.get(
-          `http://localhost:5000/api/menu/previous/${messId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setWeeklyMenu(formatMenu(response.data.data));
+        const response = await axios.get(`${api}/api/menu/previous/${messId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.data?.data) {
+          setWeeklyMenu(formatMenu(response.data.data));
+        } else throw new Error("No previous menu found");
       } catch {
+        console.warn("⚠️ No previous menu found, creating blank menu.");
         setWeeklyMenu({
           Monday: { breakfast: "", lunch: "", dinner: "" },
           Tuesday: { breakfast: "", lunch: "", dinner: "" },
@@ -88,7 +104,7 @@ export default function ManageMenus() {
     if (messId) fetchMenus();
   }, [messId, refresh]);
 
-  // 🧾 Update form
+  // 🧾 Update form fields
   const handleChange = (day, meal, value) => {
     setWeeklyMenu({
       ...weeklyMenu,
@@ -96,20 +112,32 @@ export default function ManageMenus() {
     });
   };
 
-  // 🧩 Save or update menu
+  // 🧩 Save or update weekly menu
   const handleSave = async () => {
     try {
-      setLoading(true);
       const today = new Date();
+      const dayOfWeek = today.getDay(); // 0=Sun,1=Mon,...
       const start = new Date(today);
-      start.setDate(today.getDate() - today.getDay() + 1);
+      start.setDate(today.getDate() - today.getDay() + 1); // Monday
       const end = new Date(start);
       end.setDate(start.getDate() + 6);
+
+      // 🚫 Prevent creating next week before Monday
+      // ✅ Allow creation if no menus exist at all (first-time setup)
+const isFirstMenu = menus.length === 0;
+
+// 🚫 Prevent creating next week before Monday (except first menu)
+if (!isFirstMenu && !currentMenu && dayOfWeek !== 1) {
+  alert("⚠️ You can only create a new week's menu starting Monday.");
+  return;
+}
+
+
+      setLoading(true);
       const weekNumber = Math.ceil(
         ((today - new Date(today.getFullYear(), 0, 1)) / 86400000 +
           new Date(today.getFullYear(), 0, 1).getDay() +
-          1) /
-          7
+          1) / 7
       );
 
       const dailyMenus = Object.entries(weeklyMenu).map(([day, meals], i) => ({
@@ -134,27 +162,25 @@ export default function ManageMenus() {
       };
 
       if (currentMenu && currentMenu.status === "draft") {
-        await axios.put(
-          `http://localhost:5000/api/menu/${currentMenu._id}`,
-          payload,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        alert("✅ Weekly menu updated!");
-      } else {
-        await axios.post("http://localhost:5000/api/menu", payload, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+        await axios.put(`${api}/api/menu/${currentMenu._id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
         });
-        alert("✅ New menu created!");
+        alert("✅ Draft menu updated!");
+      } else if (!currentMenu) {
+        await axios.post(`${api}/api/menu`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        alert("✅ New weekly menu created!");
+      } else if (currentMenu.status === "published") {
+        alert("⚠️ This week's menu is already published and cannot be edited.");
+        return;
       }
+
       setRefresh(!refresh);
     } catch (error) {
+      console.error(error);
       alert(
-        `❌ Failed: ${
-          error.response?.data?.message || error.message
-        }`
+        `❌ Failed to save menu: ${error.response?.data?.message || error.message}`
       );
     } finally {
       setLoading(false);
@@ -164,21 +190,19 @@ export default function ManageMenus() {
   // 🧩 Publish menu
   const handlePublish = async (menuId) => {
     try {
-      await axios.put(
-        `http://localhost:5000/api/menu/${menuId}/publish`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.put(`${api}/api/menu/${menuId}/publish`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       alert("✅ Menu published successfully!");
       setRefresh(!refresh);
     } catch (error) {
-      alert(
-        `❌ Publish failed: ${
-          error.response?.data?.message || error.message
-        }`
-      );
+      alert(`❌ Publish failed: ${error.response?.data?.message || error.message}`);
     }
   };
+
+  // 🕒 Sunday Preview Section
+  const dayOfWeek = new Date().getDay();
+  const isSunday = dayOfWeek === 0;
 
   if (loading && Object.keys(weeklyMenu).length === 0)
     return (
@@ -197,15 +221,14 @@ export default function ManageMenus() {
           <h1 className="text-3xl font-bold tracking-tight">
             Weekly Menu Management
           </h1>
-          {isPublished ? (
-            <p className="text-green-600 font-medium mt-1">
-              ✅ Current week menu is published — editing disabled.
+          {isPublished && (
+            <p className="text-green-600 mt-2 font-medium">
+              ✅ This week's menu is published and locked.
             </p>
-          ) : (
-            <p className="text-neutral-600 mt-1">
-              {currentMenu
-                ? "Editing draft menu for this week."
-                : "No current menu found — using previous week as base."}
+          )}
+          {!isPublished && currentMenu?.status === "draft" && (
+            <p className="text-yellow-600 mt-2 font-medium">
+              ✏️ Editing draft menu — changes are not yet published.
             </p>
           )}
         </header>
@@ -242,17 +265,41 @@ export default function ManageMenus() {
         </section>
 
         <div className="mt-8 flex justify-end">
-          <PrimaryButton
-            onClick={handleSave}
-            disabled={loading || isPublished}
-          >
+          <PrimaryButton onClick={handleSave} disabled={loading || isPublished}>
             {isPublished
               ? "Published (Locked)"
               : loading
               ? "Saving..."
-              : "Save Menu"}
+              : currentMenu?.status === "draft"
+              ? "Save Draft"
+              : "Create Menu"}
           </PrimaryButton>
         </div>
+
+        {/* 🕒 Next Week Preview (Visible on Sunday) */}
+        {isSunday && nextWeekMenu && (
+          <section className="mt-12">
+            <h2 className="text-2xl font-bold mb-3 text-blue-700">
+              👀 Next Week Preview (Read-only)
+            </h2>
+            <p className="text-neutral-600 mb-4">
+              You can review next week's planned menu. Editing will open Monday morning.
+            </p>
+            {nextWeekMenu.dailyMenus.map((day) => (
+              <div
+                key={day.day}
+                className="bg-gray-50 border border-neutral-200 rounded-lg p-4 mb-3"
+              >
+                <h3 className="font-semibold text-blue-600">{day.day}</h3>
+                <p className="text-sm text-neutral-700">
+                  🍳 Breakfast: {day.meals.breakfast?.items[0]?.name || "N/A"}<br />
+                  🍛 Lunch: {day.meals.lunch?.items[0]?.name || "N/A"}<br />
+                  🍽 Dinner: {day.meals.dinner?.items[0]?.name || "N/A"}
+                </p>
+              </div>
+            ))}
+          </section>
+        )}
 
         {/* 🧩 All Menus List */}
         <section className="mt-12">
@@ -262,11 +309,14 @@ export default function ManageMenus() {
           ) : (
             <div className="space-y-4">
               {menus.map((menu) => {
-                const start = new Date(menu.weekStartDate).toLocaleDateString();
-                const end = new Date(menu.weekEndDate).toLocaleDateString();
-                const isCurrent =
-                  new Date(menu.weekStartDate) <= new Date() &&
-                  new Date(menu.weekEndDate) >= new Date();
+                const options = { day: "2-digit", month: "short", year: "numeric" };
+                const start = new Date(menu.weekStartDate).toLocaleDateString("en-GB", options);
+                const end = new Date(menu.weekEndDate).toLocaleDateString("en-GB", options);
+                const now = new Date();
+                const weekStart = new Date(menu.weekStartDate);
+                const weekEnd = new Date(menu.weekEndDate);
+                weekEnd.setHours(23, 59, 59, 999);
+                const isCurrent = weekStart <= now && now <= weekEnd;
 
                 return (
                   <div
@@ -305,9 +355,7 @@ export default function ManageMenus() {
                         disabled
                         className="bg-gray-300 text-gray-600 px-4 py-2 rounded-md text-sm cursor-not-allowed"
                       >
-                        {menu.status === "published"
-                          ? "Published"
-                          : "Old Menu"}
+                        {menu.status === "published" ? "Published" : "Old Menu"}
                       </button>
                     )}
                   </div>

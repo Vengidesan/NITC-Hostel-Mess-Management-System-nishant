@@ -432,3 +432,55 @@ export const cancelLeave = async (req, res) => {
     });
   }
 };
+
+
+export const getMyMonthlySummary = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const today = new Date();
+
+    const month = today.getMonth(); // 0-indexed (0 = Jan)
+    const year = today.getFullYear();
+
+    // First day of current month
+    const startDate = new Date(year, month, 1);
+    // Today’s date (limit attendance till current date)
+    const endDate = today;
+
+    // Count number of days passed in this month (till today)
+    const totalDaysTillToday = today.getDate();
+
+    // Fetch all absent records for this student in current month
+    const absentRecords = await Attendance.find({
+      studentId,
+      date: { $gte: startDate, $lte: endDate },
+      isPresent: false, // or however you store absence (can change to isOnLeave)
+    });
+
+    const absentDays = absentRecords.length;
+    const presentDays = totalDaysTillToday - absentDays;
+    const attendancePercentage =
+      totalDaysTillToday > 0
+        ? ((presentDays / totalDaysTillToday) * 100).toFixed(2)
+        : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        month: month + 1,
+        year,
+        totalDaysTillToday,
+        absentDays,
+        presentDays,
+        attendancePercentage,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching monthly summary:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching attendance summary',
+      error: error.message,
+    });
+  }
+};

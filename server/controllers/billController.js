@@ -3,24 +3,25 @@ import User from '../models/User.js';
 import Attendance from '../models/Attendance.js';
 
 // Default meal rates (can be configured)
-const DEFAULT_MEAL_RATES = {
-  breakfast: 30,
-  lunch: 50,
-  eveningSnacks: 20,
-  dinner: 50,
-};
+// const DEFAULT_MEAL_RATES = {
+//   breakfast: 30,
+//   lunch: 50,
+//   eveningSnacks: 20,
+//   dinner: 50,
+// };
 
-const DEFAULT_FIXED_CHARGES = 100; // Monthly fixed charges
+// const DEFAULT_FIXED_CHARGES = 100; // Monthly fixed charges
 
 // @desc    Generate bill for a student
 // @route   POST /api/bills/generate
 // @access  Private (Admin only)
 export const generateBill = async (req, res) => {
   try {
-    const { studentId, messId, month, year, mealRates, fixedCharges } = req.body;
+    // const { studentId, messId, month, year, mealRates, fixedCharges } = req.body;
+    const { studentId, messId, month, year, foodCostPerDay, fixedCharges } = req.body;
 
-    const rates = mealRates || DEFAULT_MEAL_RATES;
-    const fixed = fixedCharges || DEFAULT_FIXED_CHARGES;
+    // const rates = mealRates || DEFAULT_MEAL_RATES;
+    // const fixed = fixedCharges || DEFAULT_FIXED_CHARGES;
 
         // ✅ Restrict admin to generate only previous month's bills
     const now = new Date();
@@ -39,15 +40,18 @@ export const generateBill = async (req, res) => {
     }
 
 
-    const bill = await Bill.generateFromAttendance(
-      studentId,
-      messId,
-      month,
-      year,
-      rates,
-      fixed,
-      req.user._id
-    );
+    
+
+const bill = await Bill.generateFromAttendance(
+  studentId,
+  messId,
+  month,
+  year,
+  foodCostPerDay,
+  fixedCharges,
+  req.user._id
+);
+
 
     const populatedBill = await Bill.findById(bill._id).populate(
       'studentId',
@@ -74,10 +78,10 @@ export const generateBill = async (req, res) => {
 // @access  Private (Admin only)
 export const generateAllBills = async (req, res) => {
   try {
-    const { messId, month, year, mealRates, fixedCharges } = req.body;
+    const { messId, month, year, foodCostPerDay, fixedCharges } = req.body;
 
-    const rates = mealRates || DEFAULT_MEAL_RATES;
-    const fixed = fixedCharges || DEFAULT_FIXED_CHARGES;
+    // const rates = mealRates || DEFAULT_MEAL_RATES;
+    // const fixed = fixedCharges || DEFAULT_FIXED_CHARGES;
 
         // ✅ Restrict admin to generate only previous month's bills
     const now = new Date();
@@ -109,8 +113,8 @@ export const generateAllBills = async (req, res) => {
           messId,
           month,
           year,
-          rates,
-          fixed,
+          foodCostPerDay,
+          fixedCharges,
           req.user._id
         );
         generatedBills.push(bill);

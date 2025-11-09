@@ -36,6 +36,7 @@ export default function GenerateBills() {
         messId: user?.messId,
         month: parseInt(month),
         year: parseInt(year),
+        foodCostPerDay:parseInt(formData.foodCost),
         fixedCharges: Number(formData.extras) || 0,
       });
 

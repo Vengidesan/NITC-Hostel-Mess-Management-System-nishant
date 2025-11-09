@@ -1,4 +1,5 @@
 export default function StatBadge({ label, value, icon }) {
+  console.log(value);
   return (
     <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-4 flex items-center gap-3">
       <div className="p-2 rounded-lg bg-blue-200 text-blue-700">

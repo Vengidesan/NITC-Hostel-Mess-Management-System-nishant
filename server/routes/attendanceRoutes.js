@@ -9,6 +9,7 @@ import {
   updateAttendance,
   deleteAttendance,
   cancelLeave,
+  getMyMonthlySummary,
 } from '../controllers/attendanceController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/roleMiddleware.js';
@@ -20,6 +21,7 @@ router.post('/', protect, authorize('student'), markAttendance);
 router.post('/leave', protect, authorize('student'), registerLeave);
 router.get('/my-attendance', protect, authorize('student'), getMyAttendance);
 router.put('/cancel-leave/:id', protect, cancelLeave);
+router.get('/summary', protect, authorize('student'), getMyMonthlySummary);
 
 // Student, Manager, and Admin routes
 router.get('/monthly/:month/:year', protect, getMonthlyAttendance);

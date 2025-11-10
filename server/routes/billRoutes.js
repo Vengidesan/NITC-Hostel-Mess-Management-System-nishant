@@ -14,6 +14,8 @@ import {
   getBillingSummary,
   autoApplyLateFees,
   updateBill,
+  getPendingBills,
+  markBillsAsPaid,
 } from "../controllers/billController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { authorize } from "../middleware/roleMiddleware.js";
@@ -22,6 +24,8 @@ const router = express.Router();
 
 // Student routes
 router.get("/my-bills", protect, authorize("student"), getMyBills);
+router.get("/pending", protect, authorize("student"), getPendingBills);
+router.put("/mark-paid", protect, authorize("student"), markBillsAsPaid);
 
 // Manager and Admin routes
 router.get(

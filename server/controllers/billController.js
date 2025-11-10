@@ -615,3 +615,87 @@ export const updateBill = async (req, res) => {
     });
   }
 };
+
+
+// ============================
+// ✅ 1. Mark Bills as Paid (via PayNow.jsx)
+// ============================
+export const markBillsAsPaid = async (req, res) => {
+  try {
+    const { billIds, transactionId, paymentMethod = "upi" } = req.body;
+    const user = req.user;
+
+    if (!billIds || billIds.length === 0) {
+      return res.status(400).json({ success: false, message: "No bills selected." });
+    }
+
+    const bills = await Bill.find({
+      _id: { $in: billIds },
+      studentId: user._id,
+      isCancelled: false,
+    });
+
+    if (bills.length === 0) {
+      return res.status(404).json({ success: false, message: "No valid bills found." });
+    }
+
+    const now = new Date();
+
+    for (let bill of bills) {
+      const amountToPay = bill.amountDue;
+
+      bill.addPayment(
+        amountToPay,
+        paymentMethod,
+        transactionId || `UPI-${now.getTime()}`,
+        user._id, // For now, student ID as payer
+        "Self-paid via PayNow"
+      );
+
+      bill.paidDate = now;
+      await bill.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Payment recorded successfully.",
+      data: bills,
+    });
+  } catch (error) {
+    console.error("💥 Payment Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to record payment.",
+      error: error.message,
+    });
+  }
+};
+
+// ============================
+// ✅ 2. Fetch Pending Bills (PayPendingBills.jsx)
+// ============================
+export const getPendingBills = async (req, res) => {
+  try {
+    const user = req.user;
+    const bills = await Bill.find({
+      studentId: user._id,
+      paymentStatus: { $in: ["unpaid", "partially_paid", "overdue"] },
+      isCancelled: false,
+    })
+      .sort({ year: -1, month: -1 })
+      .lean();
+
+    res.status(200).json({ success: true, data: bills });
+  } catch (error) {
+    console.error("💥 Fetch Pending Bills Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch pending bills.",
+      error: error.message,
+    });
+  }
+};
+
+
+
+

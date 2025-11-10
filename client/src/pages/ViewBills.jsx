@@ -3,12 +3,14 @@ import Navbar from "../components/Navbar.jsx";
 import Sidebar from "../components/Sidebar.jsx";
 import PrimaryButton from "../components/PrimaryButton.jsx";
 import { getMyBills } from "../api/billApi.js";
+import { useNavigate } from "react-router-dom";
 
 export default function ViewBills() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem("user"));
+  const navigate=useNavigate();
 
   useEffect(() => {
     const fetchBills = async () => {
@@ -82,7 +84,7 @@ export default function ViewBills() {
 
         {hasPending && (
           <div className="mt-8 flex justify-end">
-            <PrimaryButton>Pay Pending Bills</PrimaryButton>
+            <PrimaryButton onClick={() => navigate("/pay-pending-bills")}>Pay Pending Bills</PrimaryButton>
           </div>
         )}
       </main>

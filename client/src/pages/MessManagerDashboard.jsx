@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar.jsx";
 import Sidebar from "../components/Sidebar.jsx";
 import Card from "../components/Card.jsx";
@@ -6,19 +6,43 @@ import StatBadge from "../components/StatBadge.jsx";
 import PrimaryButton from "../components/PrimaryButton.jsx";
 import OutlineButton from "../components/OutlineButton.jsx";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
-
-import { 
-  Utensils, 
-  BarChart2, 
-  ClipboardList, 
-  FilePieChart 
+import {
+  Utensils,
+  BarChart2,
+  ClipboardList,
+  FilePieChart,
 } from "lucide-react";
 
 export default function MessManagerDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    avgMealRating: "-",
+    absenceRequests: "-",
+    weeklyMenus: "-",
+  });
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
 
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_SERVER_URL}/api/reports/manager-dashboard`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setStats(res.data.data);
+      } catch (error) {
+        console.error("Failed to fetch manager stats:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [token]);
 
   return (
     <div className="min-h-screen font-sans">
@@ -38,17 +62,17 @@ export default function MessManagerDashboard() {
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
           <StatBadge
             label="Avg Meal Rating"
-            value="4.3"
+            value={loading ? "..." : stats.avgMealRating}
             icon={<BarChart2 className="h-5 w-5" />}
           />
           <StatBadge
             label="Absence Requests"
-            value="18"
+            value={loading ? "..." : stats.absenceRequests}
             icon={<ClipboardList className="h-5 w-5" />}
           />
           <StatBadge
             label="Weekly Menu Cycles"
-            value="4"
+            value={loading ? "..." : stats.weeklyMenus}
             icon={<Utensils className="h-5 w-5" />}
           />
         </section>
@@ -60,9 +84,11 @@ export default function MessManagerDashboard() {
             icon={<Utensils />}
             title="Weekly Menu Management"
             description="Post or update weekly menu plans for students."
-            actions={<PrimaryButton onClick={() => navigate("/manage-menus")}>Manage Menus</PrimaryButton>
+            actions={
+              <PrimaryButton onClick={() => navigate("/manage-menus")}>
+                Manage Menus
+              </PrimaryButton>
             }
-            
           />
 
           {/* Feedback & Analytics */}
@@ -70,7 +96,10 @@ export default function MessManagerDashboard() {
             icon={<BarChart2 />}
             title="Feedback Analytics"
             description="View consolidated feedback and meal-wise ratings."
-            actions={<PrimaryButton onClick={() => navigate("/feedback-analytics")}>View Analytics</PrimaryButton>
+            actions={
+              <PrimaryButton onClick={() => navigate("/feedback-analytics")}>
+                View Analytics
+              </PrimaryButton>
             }
           />
 
@@ -79,7 +108,11 @@ export default function MessManagerDashboard() {
             icon={<ClipboardList />}
             title="Attendance Insights"
             description="Track student attendance trends and patterns."
-            actions={<OutlineButton>View Attendance</OutlineButton>}
+            actions={
+              <PrimaryButton onClick={() => navigate("/attendance-insights")}>
+                View Attendance
+              </PrimaryButton>
+            }
           />
 
           {/* Reports */}
@@ -87,7 +120,11 @@ export default function MessManagerDashboard() {
             icon={<FilePieChart />}
             title="Feedback Reports"
             description="Download monthly or weekly feedback reports."
-            actions={<OutlineButton>Generate Report</OutlineButton>}
+            actions={
+              <OutlineButton onClick={() => navigate("/feedback-reports")}>
+                Generate Report
+              </OutlineButton>
+            }
           />
         </section>
       </main>
